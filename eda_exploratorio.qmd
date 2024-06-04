@@ -1,0 +1,35 @@
+---
+title: "EDA_bivariado"
+author: "Sebastian Varela"
+date: "`r Sys.Date()`"
+---
+
+## Intro
+
+Se continua el trabajo bibliométrico realizado en 2023, enviado a publicación, con el siguiente abstract:
+
+*This article offers a comprehensive examination of perspectives on university-industry interactions in Latin America. Distinguishing itself from international reviews, the study employs a systematic review of 274 articles across Scopus, Scielo, and Dialnet databases. The research addresses the temporal evolution, disciplinary fields, conceptual approaches, methods, and prevailing topics in the region. Findings reveal a focus on management, economics, business, social sciences, and engineering disciplines. Qualitative methods dominate, while theoretical-conceptual approaches encompass meso-institutional and micro-interactional levels. Key research themes include collaboration results, knowledge transfer, innovation, technological transfer, and collaboration barriers*.
+
+En la presente notebook se avanza en el análisis exploratorio de relaciones bivariadas.
+
+## EDA inicial con Data Explorer
+
+Importación de archivo:
+
+Sebastián
+```{r}
+(datos <- readr::read_rds("dataset_versino_2024.rds"))
+```
+
+## Selección de las variables de interés
+
+
+
+
+
+
+## Analisis bivariado
+
+Se usa DataExplorer
+
+
