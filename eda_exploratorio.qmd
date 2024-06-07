@@ -1,5 +1,5 @@
 ---
-title: "EDA_bivariado"
+title: "Análisis exploratorio multivariado"
 author: "Sebastian Varela"
 date: "`r Sys.Date()`"
 ---
@@ -14,22 +14,323 @@ En la presente notebook se avanza en el análisis exploratorio de relaciones biv
 
 ## EDA inicial con Data Explorer
 
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(DataExplorer)
+library(lares)
+library(DT)
+```
+
+```{r}
+# Configurar scipen para evitar notación científica
+options(scipen = 999)
+```
+
 Importación de archivo:
 
 Sebastián
 ```{r}
-(datos <- readr::read_rds("dataset_versino_2024.rds"))
+datos <- readr::read_rds("dataset_versino_2024.rds")
 ```
 
-## Selección de las variables de interés
+## Selección de las variables de interés:
 
+* Campo disciplinar
+* Método usado
+* Estudio de caso (sí-no)
+* Conceptual Approaches
+* Specific Theoretical Perspective (esta es múltiple)
+* Main Research Topics (multiple)
+* Año de publicación: esta es una variable temporal, y hay que ver luego como relacionarla con las demás
 
-
-
-
+```{r}
+datos1 <- datos %>% 
+  select(Campo, Metodo, Estudio_caso, Perspectiva_gral, triple_hélice: ed_superior_final, motivacion: Otros., `Publication Year`) %>% 
+  mutate(antiguedad =  2023 - `Publication Year`) %>% 
+  select(- `Publication Year` )
+```
 
 ## Analisis bivariado
 
-Se usa DataExplorer
+Se usa DataExplorer:
+
+Estas distribuciones univariadas ya las conocemos:
+```{r, fig.width=7}
+datos1 %>% 
+  select(Campo, Metodo, Estudio_caso, Perspectiva_gral, ) %>% 
+  plot_bar(title = "Gráficos de barras de variables categóricas", ggtheme = theme_light(), nrow = 4L,ncol = 2L)
+```
+
+Variable numérica:
+
+```{r, fig.width=5}
+plot_histogram(datos1)
+```
+
+Supongamos que una variable dependiente de interés es Conceptual Approaches:
+
+```{r, fig.width=4}
+plot_boxplot(datos1, by = "Perspectiva_gral")
+```
+
+Vemos por ejemplo que la perspectica interaccional tiene artículos en promedio más antiguos.
+
+```{r}
+plot_bar(datos, by = "Perspectiva_gral", ggtheme = theme_light(), nrow = 4L,ncol = 2L)
+```
+
+Mucho se puede decir respecto de lo de arriba. Quizás tengamos que hacer un brainstorming the preguntas. Por ejemplo, qué características tienen los artículos hechos desde una perspectiva micro interaccional? son predominantemente de bases latinas, de ciencias sociales, de método cualitativo o mixto, tienden a ser estudios de casos o investigación acción, con las siguientes perspectivas teóricas dominantes: tería de redes y Otras teorías. Sus tópico dominante es Extensión. Así, ya vemos que un artículo puede consistir en una comparación entre los artículos según su perspectiva teórica general. Y si a eso le agregamos un poco de text mining sobre los abstracts. Ya con una feta de estos datos hay un artículo.
+
+**Análisis de correlaciones**:
+
+```{r}
+datos1 <- datos1 %>%
+  mutate_if(is.character, ~ as.factor(.))
+```
+
+Funciona para variables categóricas
+```{r, fig.width=11}
+datos1 %>% 
+select(Campo, Metodo, Estudio_caso, Perspectiva_gral) %>% 
+plot_correlation(title = "Matriz de correlaciones", ggtheme = theme_light())
+```
+
+hay que dumificar las múltiples.
+
+```{r}
+#Dumificar las variables categóricas.
+ dumificada <- dummify(datos1)
+```
+
+```{r, fig.width=20}
+plot_correlation(na.omit(dumificada, title = "Matriz de correlaciones", ggtheme = theme_light()))
+```
+Explotó en el gráfico de arriba por la dimensionalidad... el problema aquí como observar las relaciones entre un número grande de variables (26 variables)
+
+Probemos ranking de correlaciones. Cuáles son las correlaciones más fuertes?, en este caso las correlaciones **azules** son positivas (R de Pearson). ¿Cómo se interpreta el NA (dato no disponible)? por ejemplo "canales_NA" se interpreta como "cuando el main research topic no es canales".
+
+Antes hay que crear variables numéricas ficticias a partir de variables categóricas, lo cual lleva el número de variables a 56!
+
+```{r, echo=FALSE,message=FALSE, fig.asp=2, fig.width=10, warning=FALSE}
+library(lares)
+
+corr_cross(dumificada, # name of dataset
+  max_pvalue = 0.05, # display only significant correlations (at 5% level)
+  top = 50 # display top 10 couples of variables (by correlation coefficient)
+)
+```
+
+Ahora sin las vriables NA:
+
+```{r}
+dumificada_filtro <- dumificada %>% 
+  select(-ends_with("NA"))
+```
+
+```{r, echo=FALSE,message=FALSE, fig.asp=2, fig.width=10, warning=FALSE}
+corr_cross(dumificada_filtro, # name of dataset
+  max_pvalue = 0.05, # display only significant correlations (at 5% level)
+  top = 50 # display top 10 couples of variables (by correlation coefficient)
+)
+```
+
+## Análisis de componentes principales
+
+#### Renombrar las variables
+
+A fin de que puedan ser un poco más inteligibles en el plano factorial:
+
+* a = antigüedad
+* b = Campo_Administración..Economía..Negocios
+* c = Campo_Ciencias.Sociales
+* d = Campo_Ingeniería
+* e = Metodo_Cualitativo
+* f = Metodo_Cuantitativo
+* g = Metodo_Mixta
+* h = Estudio_caso_No
+* i = Estudio_caso_Sí
+* j = Perspectiva_gral_meso.institucional
+* k = Perspectiva_gral_micro.interaccional
+* l = triple_hélice_Triple.Hélice
+* m = triáng_Sábato_Triáng.Sábato
+* n = SNI_SRI_SSI_SNI.SRI.SSI
+* o = teoría_redes_Teoría.de.Redes
+* p = otras_Otras.teorías
+* q = modo2_Modo.2
+* r = no_tiene_No.tiene
+* s = cs_políticas_Política.y.gestión
+* t = ed_superior_final_Ed..superior
+* u = motivacion_Motivación
+* v = canales_Canales
+* w = barreras_Barreras
+* x = actividades_Actividades
+* y = resultados_Resultados
+* z = transferencia_Transferencia
+* aa = absorcion_Capac..absorción
+* ab = universidad_e_Univ..emprendedora
+* ac = innovacion_Innovación
+* ad = extension_Extensión
+* ae = politicas_Política.y.gestión
+* af = Otros._Otros.temas
+ 
+```{r}
+dumificada_filtro_1 <- dumificada_filtro %>%
+  rename(
+    a = antiguedad,
+    b = Campo_Administración..Economía..Negocios,
+    c = Campo_Ciencias.Sociales,
+    d = Campo_Ingeniería,
+    e = Metodo_Cualitativo,
+    f = Metodo_Cuantitativo,
+    g = Metodo_Mixta,
+    h = Estudio_caso_No,
+    i = Estudio_caso_Sí,
+    j = Perspectiva_gral_meso.institucional,
+    k = Perspectiva_gral_micro.interaccional,
+    l = triple_hélice_Triple.Hélice,
+    m = triáng_Sábato_Triáng.Sábato,
+    n = SNI_SRI_SSI_SNI.SRI.SSI,
+    o = teoría_redes_Teoría.de.Redes,
+    p = otras_Otras.teorías,
+    q = modo2_Modo.2,
+    r = no_tiene_No.tiene,
+    s = cs_políticas_Política.y.gestión,
+    t = ed_superior_final_Ed..superior,
+    u = motivacion_Motivación,
+    v = canales_Canales,
+    w = barreras_Barreras,
+    x = actividades_Actividades,
+    y = resultados_Resultados,
+    z = transferencia_Transferencia,
+    aa = absorcion_Capac..absorción,
+    ab = universidad_e_Univ..emprendedora,
+    ac = innovacion_Innovación,
+    ad = extension_Extensión,
+    ae = politicas_Política.y.gestión,
+    af = Otros._Otros.temas
+  )
+```
+ 
+ 
+```{r, eval=FALSE}
+names(dumificada_filtro_1)
+```
+```{r, warning=FALSE, message=FALSE}
+library("factoextra")
+```
+
+```{r, warning=FALSE, message=FALSE}
+res.pca <- prcomp(dumificada_filtro_1, scale = TRUE)
+```
+
+
+Visualizar eigenvalues (scree plot):
+```{r, warning=FALSE, message=FALSE, fig.width=5}
+fviz_eig(res.pca)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+fviz_pca_var(res.pca,
+             repel = TRUE     
+             )
+```
+Idem anterior pero el color indica cuales son las variables más relevantes para la solución hallada (aparecen en color rojo). El algortimo no encuentra patrones fuertes.
+
+```{r, warning=FALSE, message=FALSE, fig.width=7}
+fviz_pca_var(res.pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+```
+
+Interpretación pendiente, pero por ejemplo el cuadrante inferior izquierdo indica que las variables k, c, e, ad, af y p están positivamente relacionadas entre sí, formando un cluster de variables. Lo mismo en el derecho las variables h, f, aa, b. Lo mismo con i, w, v x, y, ab. Lo mmismo b y j. Se trata entonces, desde el punto de vista interpretativo, de buscar e in tentar explicar clusters.
+
+Por otro lado, mirando espacialmente el gráfico vemos que la variables w y h ,por ejemplo, están negativamente asociadas, ya que están en sectores opuestos del plano. Las variables que están más cerca del centroide tienen menos importancia porque en esos caso las correlaciones son menores.
+
+Estos resultados han de ser compatibles con lo hallado en el gráfico de barras con todas las Ranked-Cross-Correlations de más arriba. La diferencia es qua acá las relaciones son multivariadas en vez de bivariadas.
+
+Por otro lado, la interpretación debe considerar las dos dimensiones principales, la horizontal y la vertical. La horizontal opone a las variables k, e, i, c versus las variables h, aa, f, b  y j. Esa es la dimensión 1. ¿Le podemos poner un nombre a esa dimensión o componente horizontal?. En caso de que así... bingo, hemos hecho un descubrimiento teórico.
+
+Lo mismo respecto de la dimensión vertical, si se le puede encontrar un sentido teórico ya se recontra justifica un artículo.
+
+```{r, results='hide'}
+#Contribución de las variables a los factores
+# Results for Variables
+res.var <- get_pca_var(res.pca)
+```
+
+* **Cargas (Loadings)**: Las cargas son los coeficientes de las variables originales en la combinación lineal que forma los componentes principales. Indican la dirección y la fuerza de la relación entre las variables originales y los componentes principales. Los valores de las cargas pueden ser positivos o negativos, lo que refleja la dirección de la relación.
+
+```{r}
+# Extraer las contribuciones y las cargas
+contribuciones <- as.data.frame(res.var$contrib)
+cargas <- as.data.frame(res.var$coord)
+
+# Añadir nombres de las variables
+contribuciones$Variable <- rownames(contribuciones)
+cargas$Variable <- rownames(cargas)
+
+# Multiplicar las contribuciones por los signos de las cargas para preservar el signo
+contribuciones_signed <- contribuciones %>%
+  mutate(Dim.1 = Dim.1 * sign(cargas$Dim.1),
+         Dim.2 = Dim.2 * sign(cargas$Dim.2))
+
+# Seleccionar y ordenar por la contribución en Dim.1
+contribuciones_signed <- contribuciones_signed %>% 
+  select(Variable, Dim.1, Dim.2) %>% 
+  arrange(-abs(Dim.1))
+```
+
+Creamos otra variable con los nombres, para facilitar su interpretación:
+```{r}
+contribuciones_signed <- contribuciones_signed %>%
+  mutate(Original = case_when(
+    Variable == "a" ~ "antiguedad",
+    Variable == "b" ~ "Campo_Administración..Economía..Negocios",
+    Variable == "c" ~ "Campo_Ciencias.Sociales",
+    Variable == "d" ~ "Campo_Ingeniería",
+    Variable == "e" ~ "Metodo_Cualitativo",
+    Variable == "f" ~ "Metodo_Cuantitativo",
+    Variable == "g" ~ "Metodo_Mixta",
+    Variable == "h" ~ "Estudio_caso_No",
+    Variable == "i" ~ "Estudio_caso_Sí",
+    Variable == "j" ~ "Perspectiva_gral_meso.institucional",
+    Variable == "k" ~ "Perspectiva_gral_micro.interaccional",
+    Variable == "l" ~ "triple_hélice_Triple.Hélice",
+    Variable == "m" ~ "triáng_Sábato_Triáng.Sábato",
+    Variable == "n" ~ "SNI_SRI_SSI_SNI.SRI.SSI",
+    Variable == "o" ~ "teoría_redes_Teoría.de.Redes",
+    Variable == "p" ~ "otras_Otras.teorías",
+    Variable == "q" ~ "modo2_Modo.2",
+    Variable == "r" ~ "no_tiene_No.tiene",
+    Variable == "s" ~ "cs_políticas_Política.y.gestión",
+    Variable == "t" ~ "ed_superior_final_Ed..superior",
+    Variable == "u" ~ "motivacion_Motivación",
+    Variable == "v" ~ "canales_Canales",
+    Variable == "w" ~ "barreras_Barreras",
+    Variable == "x" ~ "actividades_Actividades",
+    Variable == "y" ~ "resultados_Resultados",
+    Variable == "z" ~ "transferencia_Transferencia",
+    Variable == "aa" ~ "absorcion_Capac..absorción",
+    Variable == "ab" ~ "universidad_e_Univ..emprendedora",
+    Variable == "ac" ~ "innovacion_Innovación",
+    Variable == "ad" ~ "extension_Extensión",
+    Variable == "ae" ~ "politicas_Política.y.gestión",
+    Variable == "af" ~ "Otros._Otros.temas",
+    TRUE ~ NA_character_ # Manejo de valores no coincidentes
+  ))
+
+contribuciones_signed <- contribuciones_signed %>%
+  select(Variable, Original, Dim.1, Dim.2)
+```
+
+```{r}
+# Mostrar el resultado
+datatable(contribuciones_signed)
+```
+
+La dimensión o componente 1 es la dimensión horizontal del gráfico, la dimensión o componente 2 es la vertical. Esta tabla interactiva ayuda mucho a la interpretación del gráfico de componentes principales.
 
 
