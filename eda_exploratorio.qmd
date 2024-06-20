@@ -42,12 +42,21 @@ datos <- readr::read_rds("dataset_versino_2024.rds")
 * Specific Theoretical Perspective (esta es múltiple)
 * Main Research Topics (multiple)
 * Año de publicación: esta es una variable temporal, y hay que ver luego como relacionarla con las demás
+* Source 
 
 ```{r}
 datos1 <- datos %>% 
-  select(Campo, Metodo, Estudio_caso, Perspectiva_gral, triple_hélice: ed_superior_final, motivacion: Otros., `Publication Year`) %>% 
+  select(Campo, Metodo, Estudio_caso, Perspectiva_gral, triple_hélice: ed_superior_final, motivacion: Otros., `Publication Year`, Source) %>% 
   mutate(antiguedad =  2023 - `Publication Year`) %>% 
-  select(- `Publication Year` )
+  select(- `Publication Year`) 
+
+datos1 <- datos1 %>% 
+  rename(Base = Source)
+
+datos1 <- datos1 %>%
+mutate(Base = fct_recode(Base,
+"Latina" = "latino"
+)) 
 ```
 
 ## Analisis bivariado
@@ -57,7 +66,7 @@ Se usa DataExplorer:
 Estas distribuciones univariadas ya las conocemos:
 ```{r, fig.width=7}
 datos1 %>% 
-  select(Campo, Metodo, Estudio_caso, Perspectiva_gral, ) %>% 
+  select(Campo, Metodo, Estudio_caso, Perspectiva_gral, Base ) %>% 
   plot_bar(title = "Gráficos de barras de variables categóricas", ggtheme = theme_light(), nrow = 4L,ncol = 2L)
 ```
 
@@ -76,7 +85,7 @@ plot_boxplot(datos1, by = "Perspectiva_gral")
 Vemos por ejemplo que la perspectica interaccional tiene artículos en promedio más antiguos.
 
 ```{r}
-plot_bar(datos, by = "Perspectiva_gral", ggtheme = theme_light(), nrow = 4L,ncol = 2L)
+plot_bar(datos1, by = "Perspectiva_gral", ggtheme = theme_light(), nrow = 4L,ncol = 2L)
 ```
 
 Mucho se puede decir respecto de lo de arriba. Quizás tengamos que hacer un brainstorming the preguntas. Por ejemplo, qué características tienen los artículos hechos desde una perspectiva micro interaccional? son predominantemente de bases latinas, de ciencias sociales, de método cualitativo o mixto, tienden a ser estudios de casos o investigación acción, con las siguientes perspectivas teóricas dominantes: tería de redes y Otras teorías. Sus tópico dominante es Extensión. Así, ya vemos que un artículo puede consistir en una comparación entre los artículos según su perspectiva teórica general. Y si a eso le agregamos un poco de text mining sobre los abstracts. Ya con una feta de estos datos hay un artículo.
@@ -91,7 +100,7 @@ datos1 <- datos1 %>%
 Funciona para variables categóricas
 ```{r, fig.width=11}
 datos1 %>% 
-select(Campo, Metodo, Estudio_caso, Perspectiva_gral) %>% 
+select(Campo, Metodo, Estudio_caso, Perspectiva_gral, Base) %>% 
 plot_correlation(title = "Matriz de correlaciones", ggtheme = theme_light())
 ```
 
@@ -124,7 +133,7 @@ Ahora sin las vriables NA:
 
 ```{r}
 dumificada_filtro <- dumificada %>% 
-  select(-ends_with("NA"))
+  select(-ends_with("_NA"))
 ```
 
 ```{r, echo=FALSE,message=FALSE, fig.asp=2, fig.width=10, warning=FALSE}
@@ -172,6 +181,8 @@ A fin de que puedan ser un poco más inteligibles en el plano factorial:
 * ad = extension_Extensión
 * ae = politicas_Política.y.gestión
 * af = Otros._Otros.temas
+* ag = Base_Latina
+* ah = Base_Scopus
  
 ```{r}
 dumificada_filtro_1 <- dumificada_filtro %>%
@@ -207,7 +218,9 @@ dumificada_filtro_1 <- dumificada_filtro %>%
     ac = innovacion_Innovación,
     ad = extension_Extensión,
     ae = politicas_Política.y.gestión,
-    af = Otros._Otros.temas
+    af = Otros._Otros.temas,
+    ag = Base_Latina,
+    ah = Base_Scopus
   )
 ```
  
@@ -245,15 +258,18 @@ fviz_pca_var(res.pca,
              )
 ```
 
-Interpretación pendiente, pero por ejemplo el cuadrante inferior izquierdo indica que las variables k, c, e, ad, af y p están positivamente relacionadas entre sí, formando un cluster de variables. Lo mismo en el derecho las variables h, f, aa, b. Lo mismo con i, w, v x, y, ab. Lo mmismo b y j. Se trata entonces, desde el punto de vista interpretativo, de buscar e in tentar explicar clusters.
+Podemos interpretar esto viendo qué variables forman clusters, porque están asociadas fuertemente. 
 
-Por otro lado, mirando espacialmente el gráfico vemos que la variables w y h ,por ejemplo, están negativamente asociadas, ya que están en sectores opuestos del plano. Las variables que están más cerca del centroide tienen menos importancia porque en esos caso las correlaciones son menores.
+* En el cuadrante superior derecho: v (canales), w (barreras), x (actividades), u (motivación), ab (universidad emprendedora), i (case study)
+* En el cuadrante superior izquierdo: ah (base Scopus), j (perspectiva meso-institucional), b (campo administración/economía, negocios), ac (innovación), (ae) Política y gestión, i (triple hélice)
+* En el cuadrante inferior izquierdo: h (no es estudio de caso), f (el método es cuantitativo), aa (capacidad de absorción)
+* En el cuadrante inferior derecho: k (perspectiva micro interaccional), ag (bases regionales o latinas), c (Ciencias Sociales), ad (extensión), af (Otros temas), (a) trabajos más antiguos.
+
+¿Podemos ponerles nombres a estos cuatro cuadrantes?
 
 Estos resultados han de ser compatibles con lo hallado en el gráfico de barras con todas las Ranked-Cross-Correlations de más arriba. La diferencia es qua acá las relaciones son multivariadas en vez de bivariadas.
 
-Por otro lado, la interpretación debe considerar las dos dimensiones principales, la horizontal y la vertical. La horizontal opone a las variables k, e, i, c versus las variables h, aa, f, b  y j. Esa es la dimensión 1. ¿Le podemos poner un nombre a esa dimensión o componente horizontal?. En caso de que así... bingo, hemos hecho un descubrimiento teórico.
-
-Lo mismo respecto de la dimensión vertical, si se le puede encontrar un sentido teórico ya se recontra justifica un artículo.
+Una reducción mayor es pasar de esos cuatro cuadrantes a dos dimensiones, la dimensión 1 horizontal, y la dimensión 2 vertical. Esta es la máxima compresión posible de la información.
 
 ```{r, results='hide'}
 #Contribución de las variables a los factores
@@ -319,6 +335,8 @@ contribuciones_signed <- contribuciones_signed %>%
     Variable == "ad" ~ "extension_Extensión",
     Variable == "ae" ~ "politicas_Política.y.gestión",
     Variable == "af" ~ "Otros._Otros.temas",
+    Variable == "ag" ~ "Base_Latina",
+    Variable == "ah" ~ "Base_Scopus",
     TRUE ~ NA_character_ # Manejo de valores no coincidentes
   ))
 
@@ -331,6 +349,36 @@ contribuciones_signed <- contribuciones_signed %>%
 datatable(contribuciones_signed)
 ```
 
-La dimensión o componente 1 es la dimensión horizontal del gráfico, la dimensión o componente 2 es la vertical. Esta tabla interactiva ayuda mucho a la interpretación del gráfico de componentes principales.
+La dimensión o componente 1 es la dimensión horizontal del gráfico de arriba, la dimensión o componente 2 es la vertical. Esta tabla interactiva ayuda mucho a la interpretación del gráfico de componentes principales.
+
+Entonces, **al eje (o dimensión o componente) 1** hay que ponerle un nombre. Este eje opone a las siguientes categorías:
+
+
+**En un rincón**                         | **En el otro rincón**
+-------------                            | -------------
+Método cuantitativo                      | Perspectiva micro-interaccional
+Perspectiva meso-institucional           | Campo: Ciencias Sociales
+Campo: Administración/Economía/Negocios  | Método cualitativo
+Trabajos publicados en Scopus            | Trabajos publicados en bases regionales
+Trabajos que **NO** son Case Studies     | Trabajos que **SI** son Case Studies
+
+Nótese que el cuadro de arriba indica una dimensión **disciplinar/metodológica**, ya que método, perspectiva y campo son las variables más relevantes. Perspectivo y estudio de caso (sí no) parecen apuntar a lo mismo: la perspectiva micro-interaccional casi que implica el estudio de casos.
+
+También, **al eje (o dimensión o componente) 2** hay que ponerle un nombre. Este eje opone a las siguientes categorías.
+
+**En un rincón**                         | **En el otro rincón**
+-------------                            | -------------
+Trabajos que **NO** son Case Studies     | Trabajos que **SI** son Case Studies
+Trabajos publicados bases regionales     | Aparecen tópicos claros*
+
+*Los tópicos que aparecen son: canales, barreras, actividades y motivación.
+
+## En síntesis, de acá salen tres artículos
+
+* Caracterización de los trabajos desde las perspectivas teóricas micro interaccional vs meso institucional.
+
+* Caracterización de los trabajos en bases latinas vs en Scopus.
+
+* Artículo integrador con este análisis multivariado de arriba.
 
 
